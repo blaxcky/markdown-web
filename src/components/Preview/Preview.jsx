@@ -4,7 +4,23 @@ import markdownParser from '../../services/markdownParser';
 function Preview({ content, currentFile }) {
   const htmlContent = useMemo(() => {
     if (!content) return '';
-    return markdownParser.parse(content);
+    
+    // Debug: Log what we receive
+    console.log('Preview content:', { 
+      type: typeof content, 
+      value: content, 
+      length: content?.length,
+      isString: typeof content === 'string'
+    });
+    
+    // Ensure we have a string
+    let stringContent = content;
+    if (typeof content !== 'string') {
+      console.warn('Preview received non-string content, converting:', content);
+      stringContent = String(content || '');
+    }
+    
+    return markdownParser.parse(stringContent);
   }, [content]);
 
   const tableOfContents = useMemo(() => {
@@ -15,12 +31,25 @@ function Preview({ content, currentFile }) {
   if (!currentFile) {
     return (
       <div className="h-full flex items-center justify-center bg-slate-50 dark:bg-slate-800">
-        <div className="text-center">
+        <div className="text-center max-w-md">
           <div className="w-16 h-16 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center mb-4 mx-auto">
             <span className="text-2xl">📄</span>
           </div>
           <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">Preview ready</h3>
-          <p className="text-slate-500 dark:text-slate-400">Select a file to see the preview</p>
+          <p className="text-slate-500 dark:text-slate-400 mb-4">Select a file to see the preview</p>
+          <div className="text-left bg-white dark:bg-slate-900 p-4 rounded border text-xs">
+            <div className="font-mono text-slate-600 dark:text-slate-400">
+              <div>Supported syntax:</div>
+              <div className="mt-2 space-y-1">
+                <div><span className="text-green-600"># Headers</span></div>
+                <div><span className="text-blue-600">**Bold** *Italic*</span></div>
+                <div><span className="text-purple-600">`inline code`</span></div>
+                <div><span className="text-orange-600">&gt; Blockquotes</span></div>
+                <div><span className="text-gray-600">```</span><span className="text-red-600"> code blocks</span> <span className="text-gray-600">```</span></div>
+                <div><span className="text-indigo-600">[Links](url)</span></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );

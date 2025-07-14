@@ -27,8 +27,14 @@ export function useFileStore() {
     setError(null);
     try {
       const content = await fileSystemService.readFile(fileHandle);
+      
+      // Ensure content is a string
+      const stringContent = typeof content === 'string' ? content : String(content || '');
+      
+      console.log('File opened:', fileHandle.name, 'Content type:', typeof content, 'Length:', stringContent.length);
+      
       setCurrentFile(fileHandle);
-      setCurrentContent(content);
+      setCurrentContent(stringContent);
     } catch (err) {
       setError(err.message);
     } finally {

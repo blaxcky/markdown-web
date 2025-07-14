@@ -8,6 +8,9 @@ class MarkdownParser {
   }
 
   setupMarked() {
+    // Reset marked to default state first
+    marked.setOptions(marked.getDefaults());
+    
     marked.use({
       pedantic: false,
       gfm: true,
@@ -78,44 +81,73 @@ class MarkdownParser {
       ]
     });
 
-    const renderer = new marked.Renderer();
-    
-    renderer.table = function(header, body) {
-      return `<div class="overflow-x-auto my-4">
-        <table class="min-w-full border border-gray-200">
-          <thead class="bg-gray-50">${header}</thead>
-          <tbody>${body}</tbody>
-        </table>
-      </div>`;
-    };
-
-    renderer.tablerow = function(content) {
-      return `<tr class="border-b border-gray-200">${content}</tr>`;
-    };
-
-    renderer.tablecell = function(content, flags) {
-      const type = flags.header ? 'th' : 'td';
-      const className = flags.header ? 
-        'px-4 py-2 text-left font-medium text-gray-900' : 
-        'px-4 py-2 text-gray-700';
-      return `<${type} class="${className}">${content}</${type}>`;
-    };
-
-    renderer.blockquote = function(quote) {
-      return `<blockquote class="border-l-4 border-blue-500 pl-4 my-4 italic text-gray-600 bg-blue-50 py-2">${quote}</blockquote>`;
-    };
-
-    renderer.code = function(code, language) {
-      const validLang = hljs.getLanguage(language) ? language : 'plaintext';
-      const highlighted = hljs.highlight(code, { language: validLang }).value;
-      return `<pre class="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-4"><code class="hljs language-${validLang}">${highlighted}</code></pre>`;
-    };
-
-    marked.use({ renderer });
+    // Use the renderer option directly in marked.use
+    marked.use({
+      renderer: {
+        blockquote(quote) {
+          console.log('Blockquote renderer - input type:', typeof quote, 'value:', quote);
+          
+          // In newer marked.js versions, quote is a token object
+          let content = '';
+          
+          if (typeof quote === 'object') {
+            if (quote.tokens && Array.isArray(quote.tokens)) {
+              // Try to render tokens manually
+              content = quote.tokens.map(token => {
+                if (token.type === 'paragraph' && token.text) {
+                  return `<p>${token.text}</p>`;
+                } else if (token.text) {
+                  return token.text;
+                } else {
+                  return String(token);
+                }
+              }).join('');
+            } else if (quote.text) {
+              // Simple text property
+              content = `<p>${quote.text}</p>`;
+            } else {
+              // Try to extract any text from the object
+              content = JSON.stringify(quote);
+            }
+          } else {
+            // Legacy: quote is already a string
+            content = String(quote || '');
+          }
+          
+          return `<blockquote class="border-l-4 border-blue-500 pl-4 my-4 italic text-gray-600 bg-blue-50 py-2">${content}</blockquote>`;
+        },
+        
+        code(code, infostring, escaped) {
+          const lang = (infostring || '').match(/\S*/)?.[0];
+          const validLang = hljs.getLanguage(lang) ? lang : 'plaintext';
+          const highlighted = hljs.highlight(code, { language: validLang }).value;
+          return `<pre class="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-4"><code class="hljs language-${validLang}">${highlighted}</code></pre>`;
+        },
+        
+        table(header, body) {
+          return `<div class="overflow-x-auto my-4">
+            <table class="min-w-full border border-gray-200">
+              <thead class="bg-gray-50">${header}</thead>
+              <tbody>${body}</tbody>
+            </table>
+          </div>`;
+        }
+      }
+    });
   }
 
   parse(markdown) {
     try {
+      // Ensure we have a string
+      if (typeof markdown !== 'string') {
+        console.warn('Markdown parser received non-string input:', typeof markdown, markdown);
+        return `<p class="text-yellow-600">Warning: Expected string, got ${typeof markdown}</p>`;
+      }
+      
+      if (!markdown || markdown.trim() === '') {
+        return '<p class="text-gray-500">No content to display</p>';
+      }
+      
       return marked.parse(markdown);
     } catch (error) {
       console.error('Markdown parsing error:', error);
