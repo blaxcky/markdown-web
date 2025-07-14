@@ -8,9 +8,10 @@ class MarkdownParser {
   }
 
   setupMarked() {
-    // Reset marked to default state first
+    // Reset to clean state
     marked.setOptions(marked.getDefaults());
     
+    // Enable GitHub Flavored Markdown with task lists
     marked.use({
       pedantic: false,
       gfm: true,
@@ -19,6 +20,7 @@ class MarkdownParser {
       mangle: false
     });
 
+    // Add syntax highlighting
     marked.use(markedHighlight({
       langPrefix: 'hljs language-',
       highlight(code, lang) {
@@ -27,110 +29,18 @@ class MarkdownParser {
       }
     }));
 
-    marked.use({
-      extensions: [
-        {
-          name: 'customBlock',
-          level: 'block',
-          start(src) { 
-            return src.match(/^:::/)?.index;
-          },
-          tokenizer(src, tokens) {
-            const match = /^:::(\w+)\n([\s\S]+?)\n:::/.exec(src);
-            if (match) {
-              return {
-                type: 'customBlock',
-                raw: match[0],
-                blockType: match[1],
-                content: match[2]
-              };
-            }
-          },
-          renderer(token) {
-            const className = `custom-${token.blockType}`;
-            const content = this.parser.parse(token.content);
-            return `<div class="${className} p-4 my-4 border border-gray-200 rounded-lg bg-gray-50">${content}</div>`;
-          }
-        },
-        {
-          name: 'todo',
-          level: 'inline',
-          start(src) {
-            return src.match(/\[ \]|\[x\]/)?.index;
-          },
-          tokenizer(src, tokens) {
-            const match = /^(\[ \]|\[x\]) (.+)/.exec(src);
-            if (match) {
-              return {
-                type: 'todo',
-                raw: match[0],
-                checked: match[1] === '[x]',
-                text: match[2]
-              };
-            }
-          },
-          renderer(token) {
-            const checked = token.checked ? 'checked' : '';
-            const checkedClass = token.checked ? 'line-through text-gray-500' : '';
-            return `<label class="flex items-center space-x-2 my-1">
-              <input type="checkbox" ${checked} disabled class="rounded">
-              <span class="${checkedClass}">${token.text}</span>
-            </label>`;
-          }
-        }
-      ]
-    });
-
-    // Use the renderer option directly in marked.use
+    // Only override essential styling - let marked.js handle the parsing
     marked.use({
       renderer: {
-        blockquote(quote) {
-          console.log('Blockquote renderer - input type:', typeof quote, 'value:', quote);
-          
-          // In newer marked.js versions, quote is a token object
-          let content = '';
-          
-          if (typeof quote === 'object') {
-            if (quote.tokens && Array.isArray(quote.tokens)) {
-              // Try to render tokens manually
-              content = quote.tokens.map(token => {
-                if (token.type === 'paragraph' && token.text) {
-                  return `<p>${token.text}</p>`;
-                } else if (token.text) {
-                  return token.text;
-                } else {
-                  return String(token);
-                }
-              }).join('');
-            } else if (quote.text) {
-              // Simple text property
-              content = `<p>${quote.text}</p>`;
-            } else {
-              // Try to extract any text from the object
-              content = JSON.stringify(quote);
-            }
-          } else {
-            // Legacy: quote is already a string
-            content = String(quote || '');
-          }
-          
-          return `<blockquote class="border-l-4 border-blue-500 pl-4 my-4 italic text-gray-600 bg-blue-50 py-2">${content}</blockquote>`;
-        },
-        
         code(code, infostring, escaped) {
           const lang = (infostring || '').match(/\S*/)?.[0];
           const validLang = hljs.getLanguage(lang) ? lang : 'plaintext';
           const highlighted = hljs.highlight(code, { language: validLang }).value;
           return `<pre class="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-4"><code class="hljs language-${validLang}">${highlighted}</code></pre>`;
         },
-        
-        table(header, body) {
-          return `<div class="overflow-x-auto my-4">
-            <table class="min-w-full border border-gray-200">
-              <thead class="bg-gray-50">${header}</thead>
-              <tbody>${body}</tbody>
-            </table>
-          </div>`;
+
+        codespan(code) {
+          return `<code class="bg-gray-100 text-red-600 px-1 py-0.5 rounded text-sm font-mono">${code}</code>`;
         }
       }
     });
@@ -140,7 +50,7 @@ class MarkdownParser {
     try {
       // Ensure we have a string
       if (typeof markdown !== 'string') {
-        console.warn('Markdown parser received non-string input:', typeof markdown, markdown);
+        console.warn('Markdown parser received non-string input:', typeof markdown);
         return `<p class="text-yellow-600">Warning: Expected string, got ${typeof markdown}</p>`;
       }
       
@@ -148,15 +58,50 @@ class MarkdownParser {
         return '<p class="text-gray-500">No content to display</p>';
       }
       
-      return marked.parse(markdown);
+      const html = marked.parse(markdown);
+      
+      // Post-process the HTML to add custom classes
+      return this.addCustomClasses(html);
     } catch (error) {
       console.error('Markdown parsing error:', error);
       return `<p class="text-red-600">Error parsing markdown: ${error.message}</p>`;
     }
   }
 
+  addCustomClasses(html) {
+    // Add Tailwind classes to standard HTML elements
+    return html
+      .replace(/<blockquote>/g, '<blockquote class="border-l-4 border-blue-500 pl-4 my-4 italic text-gray-600 bg-blue-50 py-2">')
+      .replace(/<h1>/g, '<h1 class="text-3xl font-bold text-gray-900 mt-8 mb-4 pb-2 border-b-2 border-gray-200">')
+      .replace(/<h2>/g, '<h2 class="text-2xl font-bold text-gray-900 mt-6 mb-3 pb-1 border-b border-gray-200">')
+      .replace(/<h3>/g, '<h3 class="text-xl font-semibold text-gray-900 mt-4 mb-2">')
+      .replace(/<h4>/g, '<h4 class="text-lg font-semibold text-gray-900 mt-3 mb-2">')
+      .replace(/<h5>/g, '<h5 class="text-base font-semibold text-gray-900 mt-2 mb-1">')
+      .replace(/<h6>/g, '<h6 class="text-sm font-semibold text-gray-900 mt-2 mb-1">')
+      .replace(/<p>/g, '<p class="mb-4 leading-relaxed text-gray-700">')
+      .replace(/<ul>/g, '<ul class="list-disc list-inside space-y-1 my-4">')
+      .replace(/<ol>/g, '<ol class="list-decimal list-inside space-y-1 my-4">')
+      .replace(/<li>/g, '<li class="my-1">')
+      .replace(/<strong>/g, '<strong class="font-semibold text-gray-900">')
+      .replace(/<em>/g, '<em class="italic text-gray-700">')
+      .replace(/<a /g, '<a class="text-blue-600 hover:text-blue-800 underline" ')
+      .replace(/<table>/g, '<table class="min-w-full border border-gray-200 rounded-lg my-4">')
+      .replace(/<thead>/g, '<thead class="bg-gray-50">')
+      .replace(/<tbody>/g, '<tbody class="bg-white">')
+      .replace(/<tr>/g, '<tr class="border-b border-gray-200">')
+      .replace(/<th>/g, '<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">')
+      .replace(/<td>/g, '<td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">')
+      // Handle task lists specifically
+      .replace(/<li><input type="checkbox" disabled="?" ?> /g, '<li class="flex items-start space-x-2 my-1"><input type="checkbox" disabled class="mt-1 rounded"> <span>')
+      .replace(/<li><input type="checkbox" checked="?" disabled="?" ?> /g, '<li class="flex items-start space-x-2 my-1"><input type="checkbox" checked disabled class="mt-1 rounded"> <span class="line-through text-gray-500">')
+      .replace(/<\/li>/g, '</span></li>');
+  }
+
   parseInline(markdown) {
     try {
+      if (typeof markdown !== 'string') {
+        return String(markdown || '');
+      }
       return marked.parseInline(markdown);
     } catch (error) {
       console.error('Inline markdown parsing error:', error);
@@ -165,14 +110,19 @@ class MarkdownParser {
   }
 
   extractTableOfContents(markdown) {
-    const tokens = marked.lexer(markdown);
-    const headings = tokens.filter(token => token.type === 'heading');
-    
-    return headings.map(heading => ({
-      level: heading.depth,
-      text: heading.text,
-      id: heading.text.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-')
-    }));
+    try {
+      const tokens = marked.lexer(markdown);
+      const headings = tokens.filter(token => token.type === 'heading');
+      
+      return headings.map(heading => ({
+        level: heading.depth,
+        text: heading.text,
+        id: heading.text.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-')
+      }));
+    } catch (error) {
+      console.error('Error extracting table of contents:', error);
+      return [];
+    }
   }
 }
 
