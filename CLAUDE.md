@@ -18,7 +18,7 @@ No linting or test commands are configured in this project.
 
 - Project uses ES Modules (`"type": "module"` in package.json)
 - All config files must use ES import/export syntax, not CommonJS require()
-- Tailwind CSS v4 is used - ensure config uses `import` statements
+- Uses Tailwind CSS v3 (stable) with PostCSS and Autoprefixer
 
 ## Architecture & Key Components
 
