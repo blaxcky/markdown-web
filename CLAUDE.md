@@ -14,6 +14,12 @@ This is a Progressive Web App (PWA) for editing markdown files locally using the
 
 No linting or test commands are configured in this project.
 
+## Important Configuration Notes
+
+- Project uses ES Modules (`"type": "module"` in package.json)
+- All config files must use ES import/export syntax, not CommonJS require()
+- Tailwind CSS v4 is used - ensure config uses `import` statements
+
 ## Architecture & Key Components
 
 ### State Management
